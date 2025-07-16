@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Bank Login</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/11.9.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.9.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.9.1/firebase-database-compat.js"></script>
+
+  <!-- SBI-style CSS -->
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(to right, #e3f2fd, #bbdefb);
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .card {
+      background: white;
+      padding: 40px 30px;
+      border-radius: 15px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.2);
+      max-width: 400px;
+      width: 100%;
+    }
+
+    h2 {
+      margin-bottom: 15px;
+      color: #003B6F;
+    }
+
+    input {
+      padding: 12px;
+      width: 90%;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      margin-bottom: 20px;
+      font-size: 16px;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background-color: #0d47a1;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    button:hover {
+      background-color: #1565c0;
+    }
+
+    .forgot {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #0072CE;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    #status {
+      margin-top: 10px;
+      color: red;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="card" id="step1">
+    <h2>Enter Email</h2>
+    <input id="email" type="email" placeholder="Enter your Email" />
+    <button onclick="findCustomer()">Next</button>
+    <div id="status"></div>
+  </div>
+
+  <div class="card" id="step2" style="display: none;">
+    <h2>Welcome Back</h2>
+    <div><strong>Customer ID:</strong> <span id="custIDShow"></span></div>
+    <input id="password" type="password" placeholder="Enter Password" />
+    <button onclick="login()">Login</button>
+    <div class="forgot" onclick="forgotPassword()">Forgot Password?</div>
+    <div id="status2"></div>
+  </div>
+
+  <script>
+    // Firebase Config
+    const firebaseConfig = {
+      apiKey: "AIzaSyAq-Yxaccz-Ia6o9NSTC4Fm-PM02DbvIt0",
+      authDomain: "otp-verification-cb472.firebaseapp.com",
+      databaseURL: "https://otp-verification-cb472-default-rtdb.firebaseio.com",
+      projectId: "otp-verification-cb472",
+      storageBucket: "otp-verification-cb472.appspot.com",
+      messagingSenderId: "939280162949",
+      appId: "1:939280162949:web:89b969538a7f7f0e54c9ec"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.database();
+
+    let currentCID = null;
+    let emailGlobal = "";
+
+    // Step 1: Find customer by email
+    function findCustomer() {
+      const email = document.getElementById("email").value.trim();
+      const status = document.getElementById("status");
+      status.style.color = "gray";
+      status.innerText = "Checking...";
+
+      if (!email) {
+        status.style.color = "red";
+        status.innerText = "Please enter your email.";
+        return;
+      }
+
+      db.ref("customers").once("value", (snapshot) => {
+        let found = false;
+        snapshot.forEach((child) => {
+          const data = child.val();
+          if (data.email === email) {
+            currentCID = child.key;
+            emailGlobal = email;
+            found = true;
+            document.getElementById("step1").style.display = "none";
+            document.getElementById("step2").style.display = "block";
+            document.getElementById("custIDShow").innerText = data.customerId;
+          }
+        });
+
+        if (!found) {
+          status.style.color = "red";
+          status.innerText = "Email not found in database.";
+        }
+      });
+    }
+
+    // Step 2: Login with Firebase Auth
+    function login() {
+      const password = document.getElementById("password").value;
+      const status = document.getElementById("status2");
+
+      if (!password) {
+        status.innerText = "Please enter your password.";
+        return;
+      }
+
+      status.style.color = "gray";
+      status.innerText = "Logging in...";
+
+      auth.signInWithEmailAndPassword(emailGlobal, password)
+        .then(() => {
+          status.innerText = "";
+          alert("Login successful!");
+          window.location.href = "dashboard.html"; // Your dashboard
+        })
+        .catch((error) => {
+          status.style.color = "red";
+          status.innerText = error.message;
+        });
+    }
+
+    // Forgot Password using Firebase Auth
+    function forgotPassword() {
+      if (!emailGlobal) {
+        alert("Please enter your email first.");
+        return;
+      }
+
+      auth.sendPasswordResetEmail(emailGlobal)
+        .then(() => alert("Password reset email sent."))
+        .catch((error) => alert("Error: " + error.message));
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SBI Bank Admin Panel</title>
+  <script src="https://www.gstatic.com/firebasejs/11.9.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.9.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.9.1/firebase-database-compat.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Poppins', sans-serif; box-sizing: border-box; }
+    body { background: #e7ecf3; padding: 30px; }
+    .container {
+      width: 100%;
+      margin: 20px auto;
+      background: #fff;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    }
+    h2 { color: #0a3d62; margin-bottom: 20px; }
+    input, button {
+      width: 100%; padding: 12px; margin: 10px 0;
+      border-radius: 6px; font-size: 16px;
+    }
+    input { border: 1px solid #ccc; text-transform: lowercase; }
+    input:focus { outline: none; border-color: #007bff; background: #f0f8ff; }
+    button {
+      background: #007bff; color: #fff; border: none;
+      font-weight: 600; cursor: pointer;
+    }
+    button:hover { background: #0056b3; }
+    .card {
+      display: flex; align-items: center; justify-content: center;
+      font-size: 40px; font-weight: bold;
+      background: #e0f0ff; padding: 20px;
+      border-radius: 10px; color: #007bff; margin-bottom: 20px;
+    }
+    table {
+      width: 100%; border-collapse: collapse; margin-top: 10px;
+    }
+    th, td {
+      padding: 10px; border-bottom: 1px solid #ddd; text-align: left;
+    }
+    th { background-color: #007bff; color: white; }
+    tr:hover { background-color: #f1f1f1; }
+    .transaction {
+      width: 100%;
+      margin: 20px auto;
+      background: #fff;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    }
+  </style>
+</head>
+<body>
+
+<div class="container" id="loginSection">
+  <h2>Admin Login</h2>
+  <input type="text" oninput="this.value = this.value.toLowerCase()" id="adminUser" placeholder="Username">
+  <input type="password" id="adminPass" placeholder="Password">
+  <button onclick="adminLogin()">Login</button>
+  <p id="loginMsg" style="color:red;"></p>
+</div>
+
+<div id="mainPanel" style="display:none;">
+  <div class="card">₹ <span id="bankBalance">0</span></div>
+  <div class="container" id="whole">
+    <button onclick="navigate('createaccount')">CREATE CUSTOMER ACCOUNT</button>
+    <button onclick="navigate('transaction')">TRANSACTIONS</button>
+    <button onclick="navigate('Wsection')">WITHDRAW</button>
+    <button onclick="navigate('Tsection')">TRANSFER</button>
+    <button onclick="navigate('funds')">ADMIN FUNDS</button>
+    <button onclick="navigate('customerinfo')">CUSTOMER INFO</button>
+  </div>
+
+  <div class="container" id="createaccount" style="display:none;">
+    <h2>Create Bank Account</h2>
+    <input type="text" id="name" placeholder="Name">
+    <input type="text" id="aadhar" placeholder="Aadhar Number">
+    <input type="email" id="email" placeholder="Email">
+    <input type="password" id="password" placeholder="Password">
+    <input type="date" id="dob" placeholder="Date of Birth">
+    <input type="number" id="initialBalance" placeholder="Initial Balance">
+    <button onclick="createAccount()">Create Account</button>
+    <p id="createMsg"></p>
+  </div>
+
+  <div class="container" id="customerinfo" style="display:none;">
+    <h2>Customer Information</h2>
+    <input type="text" id="lookupInput" placeholder="Enter Account Number or Customer ID">
+    <button onclick="lookupCustomer()">Get Info</button>
+    <div id="customerResult" style="margin-top:20px;"></div>
+  </div>
+
+  <div class="container" id="Wsection" style="display:none;">
+    <h2>Withdraw</h2>
+    <input type="text" id="withdrawAccount" placeholder="Account Number">
+    <input type="number" id="withdrawAmount" placeholder="Amount">
+    <input type="text" id="withdrawRemark" placeholder="Remark">
+    <button onclick="withdrawMoney()">Withdraw</button>
+    <p id="withdrawMsg"></p>
+  </div>
+
+  <div class="container" id="Tsection" style="display:none;">
+    <h2>Transfer</h2>
+    <input type="text" id="transferAccount" placeholder="Target Account Number">
+    <input type="number" id="transferAmount" placeholder="Amount">
+    <input type="text" id="transferRemark" placeholder="Remark">
+    <button onclick="transferMoney()">Transfer</button>
+    <p id="transferMsg"></p>
+  </div>
+
+  <div class="container" id="funds" style="display:none;">
+    <h2>Add Funds to Admin</h2>
+    <input type="number" id="adminFundAmount" placeholder="Amount to Add">
+    <input type="text" id="adminFundRemark" placeholder="Remark">
+    <button onclick="addFundsToAdmin()">Add Funds</button>
+    <p id="adminFundMsg"></p>
+  </div>
+
+  <div class="transaction" id="transaction" style="display:none;">
+    <h2>Transaction Dashboard</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Account</th>
+          <th>Amount</th>
+          <th>Remaining Balance</th>
+          <th>Remark</th>
+          <th>Time</th>
+        </tr>
+      </thead>
+      <tbody id="transactionTable"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyAq-Yxaccz-Ia6o9NSTC4Fm-PM02DbvIt0",
+    authDomain: "otp-verification-cb472.firebaseapp.com",
+    databaseURL: "https://otp-verification-cb472-default-rtdb.firebaseio.com",
+    projectId: "otp-verification-cb472",
+    storageBucket: "otp-verification-cb472.appspot.com",
+    messagingSenderId: "939280162949",
+    appId: "1:939280162949:web:89b969538a7f7f0e54c9ec"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+  const auth = firebase.auth();
+
+  function adminLogin() {
+    const user = document.getElementById("adminUser").value;
+    const pass = document.getElementById("adminPass").value;
+    if (user === "user112" && pass === "admin112") {
+      document.getElementById("loginSection").style.display = "none";
+      document.getElementById("mainPanel").style.display = "block";
+      loadDashboard();
+      navigate('whole');
+    } else {
+      document.getElementById("loginMsg").innerText = "❌ Invalid credentials";
+    }
+  }
+
+  function navigate(section, fromPopState = false) {
+    ['whole','createaccount','Wsection','Tsection','funds','transaction','customerinfo'].forEach(id => {
+      document.getElementById(id).style.display = 'none';
+    });
+    document.getElementById(section).style.display = 'block';
+    if (section === "transaction") loadTransactions();
+    if (!fromPopState) history.pushState({ section }, "", `#${section}`);
+  }
+
+  window.addEventListener('popstate', function (e) {
+    const section = (e.state && e.state.section) || 'whole';
+    navigate(section, true);
+  });
+
+  function createAccount() {
+    const name = document.getElementById("name").value;
+    const aadhar = document.getElementById("aadhar").value;
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+    const dob = document.getElementById("dob").value;
+    const balance = parseFloat(document.getElementById("initialBalance").value);
+    if (!name || !aadhar || !email || !password || !dob || isNaN(balance)) return alert("Fill all fields");
+
+    const customerId = "CUST-" + Math.floor(100000 + Math.random() * 900000);
+    const accountNumber = Math.floor(100000000000 + Math.random() * 900000000000).toString();
+    auth.createUserWithEmailAndPassword(email, password).then(() => {
+      db.ref("customers/" + accountNumber).set({
+        customerId, name, aadhar, email, dob, balance, accountNumber
+      }).then(() => {
+        document.getElementById("createMsg").innerText = `✅ Account Created\nCustomer ID: ${customerId}\nAccount No: ${accountNumber}`;
+        ["name","aadhar","email","password","dob","initialBalance"].forEach(id => document.getElementById(id).value = "");
+        loadDashboard();
+      });
+    }).catch(err => document.getElementById("createMsg").innerText = "❌ " + err.message);
+  }
+
+  function withdrawMoney() {
+    const acc = document.getElementById("withdrawAccount").value;
+    const amt = parseFloat(document.getElementById("withdrawAmount").value);
+    const remark = document.getElementById("withdrawRemark").value || "Withdraw";
+    if (!acc || isNaN(amt)) return alert("Enter valid details");
+
+    db.ref("customers/" + acc).once('value').then(snap => {
+      if (!snap.exists()) return document.getElementById("withdrawMsg").innerText = "❌ Account not found";
+      let bal = snap.val().balance;
+      if (bal < amt) return document.getElementById("withdrawMsg").innerText = "❌ Insufficient Balance";
+      const newBal = bal - amt;
+      db.ref("customers/" + acc + "/balance").set(newBal).then(() => {
+        db.ref("admin/balance").once('value').then(adminSnap => {
+          const adminBal = (adminSnap.exists() ? adminSnap.val() : 0) + amt;
+          db.ref("admin/balance").set(adminBal).then(() => {
+            db.ref("transactions").push({
+              type: "Withdraw",
+              account: acc,
+              amount: amt,
+              balance: newBal,
+              remarks: remark,
+              time: new Date().toLocaleString()
+            });
+            document.getElementById("withdrawMsg").innerText = `✅ ₹${amt} withdrawn`;
+            document.getElementById("withdrawAccount").value = document.getElementById("withdrawAmount").value = document.getElementById("withdrawRemark").value = "";
+            loadDashboard();
+          });
+        });
+      });
+    });
+  }
+
+  function transferMoney() {
+    const acc = document.getElementById("transferAccount").value;
+    const amt = parseFloat(document.getElementById("transferAmount").value);
+    const remark = document.getElementById("transferRemark").value || "Transfer";
+    if (!acc || isNaN(amt)) return alert("Enter valid details");
+
+    db.ref("admin/balance").once('value').then(snap => {
+      let adminBal = snap.exists() ? snap.val() : 0;
+      if (adminBal < amt) return document.getElementById("transferMsg").innerText = "❌ Not enough Admin funds";
+      db.ref("customers/" + acc).once('value').then(cust => {
+        if (!cust.exists()) return document.getElementById("transferMsg").innerText = "❌ Target account not found";
+        const newCustBal = cust.val().balance + amt;
+        db.ref("customers/" + acc + "/balance").set(newCustBal).then(() => {
+          db.ref("admin/balance").set(adminBal - amt).then(() => {
+            db.ref("transactions").push({
+              type: "Transfer",
+              account: acc,
+              amount: amt,
+              balance: newCustBal,
+              remarks: remark,
+              time: new Date().toLocaleString()
+            });
+            document.getElementById("transferMsg").innerText = `✅ ₹${amt} transferred`;
+            document.getElementById("transferAccount").value = document.getElementById("transferAmount").value = document.getElementById("transferRemark").value = "";
+            loadDashboard();
+          });
+        });
+      });
+    });
+  }
+
+  function addFundsToAdmin() {
+    const amt = parseFloat(document.getElementById("adminFundAmount").value);
+    const remark = document.getElementById("adminFundRemark").value || "Admin Fund Add";
+    if (isNaN(amt)) return alert("Enter valid amount");
+    db.ref("admin/balance").once('value').then(snap => {
+      const newBal = (snap.exists() ? snap.val() : 0) + amt;
+      db.ref("admin/balance").set(newBal).then(() => {
+        db.ref("transactions").push({ type: "Admin Fund Add", account: "ADMIN", amount: amt, balance: newBal, remarks: remark, time: new Date().toLocaleString() });
+        document.getElementById("adminFundMsg").innerText = `✅ ₹${amt} added`;
+        document.getElementById("adminFundAmount").value = document.getElementById("adminFundRemark").value = '';
+        loadDashboard();
+      });
+    });
+  }
+
+  function loadDashboard() {
+    db.ref("admin/balance").once('value').then(snap => {
+      document.getElementById("bankBalance").innerText = (snap.exists() ? snap.val() : 0).toLocaleString("en-IN");
+    });
+  }
+
+  function loadTransactions() {
+    const table = document.getElementById("transactionTable");
+    table.innerHTML = "";
+    db.ref("transactions").once('value').then(snap => {
+      const transactions = [];
+      snap.forEach(child => transactions.push(child.val()));
+      transactions.reverse().forEach(data => {
+        table.innerHTML += `
+          <tr>
+            <td>${data.type}</td>
+            <td>${data.account}</td>
+            <td>₹${data.amount}</td>
+            <td>₹${(data.balance || 0)}</td>
+            <td>${data.remarks || "-"}</td>
+            <td>${data.time}</td>
+          </tr>`;
+      });
+    });
+  }
+
+  function lookupCustomer() {
+    const input = document.getElementById("lookupInput").value.trim();
+    const resultDiv = document.getElementById("customerResult");
+    resultDiv.innerHTML = "🔎 Searching...";
+    if (input.startsWith("CUST-")) {
+      db.ref("customers").orderByChild("customerId").equalTo(input).once("value", snap => {
+        if (snap.exists()) {
+          const data = Object.values(snap.val())[0];
+          resultDiv.innerHTML = `
+            <p><strong>Name:</strong> ${data.name}</p>
+            <p><strong>Email:</strong> ${data.email}</p>
+            <p><strong>Aadhar:</strong> ${data.aadhar}</p>
+            <p><strong>Date of Birth:</strong> ${data.dob || "N/A"}</p>
+            <p><strong>Account Number:</strong> ${data.accountNumber}</p>
+            <p><strong>Balance:</strong> ₹${data.balance}</p>`;
+        } else {
+          resultDiv.innerHTML = "❌ Customer ID not found";
+        }
+      });
+    } else {
+      db.ref("customers/" + input).once("value").then(snap => {
+        if (snap.exists()) {
+          const data = snap.val();
+          resultDiv.innerHTML = `
+            <p><strong>Name:</strong> ${data.name}</p>
+            <p><strong>Email:</strong> ${data.email}</p>
+            <p><strong>Aadhar:</strong> ${data.aadhar}</p>
+            <p><strong>Date of Birth:</strong> ${data.dob || "N/A"}</p>
+            <p><strong>Customer ID:</strong> ${data.customerId}</p>
+            <p><strong>Balance:</strong> ₹${data.balance}</p>`;
+        } else {
+          resultDiv.innerHTML = "❌ Account not found";
+        }
+      });
+    }
+  }
+</script>
+</body>
+</html>

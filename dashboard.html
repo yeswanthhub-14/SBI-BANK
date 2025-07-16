@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Customer Dashboard</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #eef;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+    }
+    .card {
+      background: white;
+      padding: 20px;
+      margin: 20px auto;
+      max-width: 750px;
+      border-radius: 15px;
+      box-shadow: 0 0 10px gray;
+    }
+    table {
+      width: 95%;
+      margin: auto;
+      border-collapse: collapse;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 10px;
+      text-align: center;
+    }
+    th {
+      background-color: #004b8d;
+      color: white;
+    }
+    td {
+      background-color: #f9f9f9;
+    }
+    .label {
+      font-weight: bold;
+    }
+    .value {
+      color: #333;
+    }
+    button.logout {
+      margin-top: 20px;
+      padding: 10px 20px;
+      background-color: #004b8d;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    button.logout:hover {
+      background-color: #003366;
+    }
+  </style>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/11.9.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.9.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.9.1/firebase-database-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAq-Yxaccz-Ia6o9NSTC4Fm-PM02DbvIt0",
+      authDomain: "otp-verification-cb472.firebaseapp.com",
+      databaseURL: "https://otp-verification-cb472-default-rtdb.firebaseio.com",
+      projectId: "otp-verification-cb472",
+      storageBucket: "otp-verification-cb472.appspot.com",
+      messagingSenderId: "939280162949",
+      appId: "1:939280162949:web:89b969538a7f7f0e54c9ec"
+    };
+    firebase.initializeApp(firebaseConfig);
+
+    function formatDate(timestamp) {
+      const date = new Date(timestamp);
+      return date.toLocaleDateString() + " " + date.toLocaleTimeString();
+    }
+
+    function logout() {
+      firebase.auth().signOut().then(() => {
+        window.location.href = "index.html";
+      });
+    }
+
+    function formatCustomerID(cid) {
+      return "Cust-" + cid.slice(-5);
+    }
+
+    function formatAccountNumber(raw) {
+      let num = String(raw || "");
+      return num.padStart(12, "0");
+    }
+
+    firebase.auth().onAuthStateChanged(user => {
+      if (user) {
+        const email = user.email;
+
+        firebase.database().ref("customers")
+          .orderByChild("email")
+          .equalTo(email)
+          .once("value", snapshot => {
+            if (snapshot.exists()) {
+              snapshot.forEach(child => {
+                const cid = child.key;
+                const data = child.val();
+
+                localStorage.setItem("loginCID", cid);
+
+                document.getElementById("cid").innerText = data.customerId;
+                document.getElementById("name").innerText = data.name || "-";
+                document.getElementById("dob").innerText = data.dob || "-";
+                document.getElementById("aadhar").innerText = data.aadhar || "-";
+                document.getElementById("email").innerText = data.email || "-";
+
+                // Format account number
+                const account = formatAccountNumber(data.account || cid);
+                document.getElementById("AccountNumber").innerText = account;
+                document.getElementById("balance").innerText = "₹" + (data.balance || 0);
+
+                loadTransactionHistory(cid);
+              });
+            } else {
+              alert("No customer found with this email.");
+            }
+          });
+      } else {
+        alert("User not logged in.");
+        window.location.href = "login.html";
+      }
+    });
+
+    function loadTransactionHistory(cid) {
+      const historyEl = document.getElementById("history");
+      historyEl.innerHTML = "";
+
+      firebase.database().ref("transactions/" + cid).on("value", snapshot => {
+        if (!snapshot.exists()) {
+          historyEl.innerHTML = `<tr><td colspan="6" style="color: gray;">No transactions available.</td></tr>`;
+          return;
+        }
+
+        const transactions = [];
+        snapshot.forEach(child => {
+          transactions.push(child.val());
+        });
+
+        // Sort by latest
+        transactions.sort((a, b) => (b.date || 0) - (a.date || 0));
+
+        transactions.forEach((t, index) => {
+          const row = `
+            <tr>
+              <td>${index + 1}</td>
+              <td>${t.type || "-"}</td>
+              <td>₹${t.amount || 0}</td>
+              <td>${formatDate(t.date || Date.now())}</td>
+              <td>${t.remarks || "-"}</td>
+              <td>₹${t.remaining || "-"}</td>
+            </tr>`;
+          historyEl.innerHTML += row;
+        });
+      });
+    }
+  </script>
+</head>
+<body>
+
+  <div class="card">
+    <h2>Customer Dashboard</h2>
+    <p><span class="label">Customer ID:</span> <span class="value" id="cid"></span></p>
+    <p><span class="label">Name:</span> <span class="value" id="name"></span></p>
+    <p><span class="label">Date of Birth:</span> <span class="value" id="dob"></span></p>
+    <p><span class="label">Aadhar:</span> <span class="value" id="aadhar"></span></p>
+    <p><span class="label">Email:</span> <span class="value" id="email"></span></p>
+    <p><span class="label">Account Number:</span> <span class="value" id="AccountNumber"></span></p>
+    <h3>Balance: <span id="balance"></span></h3>
+    <button class="logout" onclick="logout()">Logout</button>
+  </div>
+
+  <div class="card">
+    <h3>Transaction History</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Type</th>
+          <th>Amount</th>
+          <th>Date</th>
+          <th>Remarks</th>
+          <th>Balance</th>
+        </tr>
+      </thead>
+      <tbody id="history"></tbody>
+    </table>
+  </div>
+
+</body>
+</html>
